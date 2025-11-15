@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Post, Category, Tag
+from .models import Post, Category, Tag, Comment
 from django.utils.text import slugify
 
 
@@ -16,7 +16,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class PostSerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField()  
+    author = serializers.StringRelatedField()
     category = CategorySerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     comment_count = serializers.IntegerField(source="comments.count", read_only=True)
@@ -33,7 +33,7 @@ class PostSerializer(serializers.ModelSerializer):
             "tags",
             "excerpt",
             "body",
-            "cover_image",
+            # "cover_image",
             "status",
             "published_at",
             "created_at",
@@ -42,18 +42,35 @@ class PostSerializer(serializers.ModelSerializer):
             "like_count",
         ]
 
+
 class PostCreateUpdateSerializer(serializers.ModelSerializer):
 
     category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), source="category", write_only=True, required=False
+        queryset=Category.objects.all(),
+        source="category",
+        write_only=True,
+        required=False,
     )
     tag_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Tag.objects.all(), many=True, source="tags", write_only=True, required=False
+        queryset=Tag.objects.all(),
+        many=True,
+        source="tags",
+        write_only=True,
+        required=False,
     )
 
     class Meta:
         model = Post
-        fields = ["title", "excerpt", "body", "cover_image", "status", "published_at", "category_id", "tag_ids"]
+        fields = [
+            "title",
+            "excerpt",
+            "body",
+            "cover_image",
+            "status",
+            "published_at",
+            "category_id",
+            "tag_ids",
+        ]
 
     def create(self, validated_data):
         tags = validated_data.pop("tags", [])
@@ -73,3 +90,19 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer):
         instance.slug = slugify(instance.title)
         instance.save()
         return instance
+
+
+class RecursiveCommentSerializer(serializers.Serializer):
+    def to_representation(self, instance):
+        serializer = CommentSerializer(instance, context=self.context)
+        return serializer.data
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source="user.username")
+    replies = RecursiveCommentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ["id", "post", "user", "body", "parent", "replies", "created_at"]
+        read_only_fields = ["id", "user", "replies", "created_at"]

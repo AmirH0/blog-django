@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
-from .models import Post
-from .serializers import PostSerializer, PostCreateUpdateSerializer
+from .models import Post, Comment
+from .serializers import PostSerializer, PostCreateUpdateSerializer, CommentSerializer
 
 
 class PostListCreateAPIView(APIView):
@@ -66,3 +66,57 @@ class PostRetriveUpdataDestroyApi(APIView):
             )
         post.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CommentAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get(self, request, post_id):
+        comments = Comment.objects.filter(post_id=post_id, parent__isnull=True)
+        serializer = CommentSerializer(comments, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, post_id):
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user, post_id=post_id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CommentDetailApiView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, comment_id):
+        try:
+            return Comment.objects.get(id=comment_id)
+        except Comment.DoesNotExist:
+            return None
+
+    def put(self, request, comment_id):
+        comment = self.get_object(comment_id)
+
+        if not comment:
+            return Response({"detail": "not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if comment.user != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        serializer = CommentSerializer(comment, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.error_messages)
+
+    def delete(self, request, comment_id):
+        comment = self.get_object(comment_id)
+        if not comment:
+            return Response(
+                {"detail:": "not fpund id is wrong"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if comment.user != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        comment.delete()
+        return Response(status=status.HTTP_200_OK)

@@ -3,8 +3,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
-from .models import Post, Comment
-from .serializers import PostSerializer, PostCreateUpdateSerializer, CommentSerializer
+from .models import Post, Comment, Category, Tag
+from .serializers import (
+    PostSerializer,
+    PostCreateUpdateSerializer,
+    CommentSerializer,
+    CategorySerializer,
+    TagSerializer,
+)
 
 
 class PostListCreateAPIView(APIView):
@@ -120,3 +126,34 @@ class CommentDetailApiView(APIView):
 
         comment.delete()
         return Response(status=status.HTTP_200_OK)
+
+
+class categoryListCreateApi(APIView):
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        category = Category.objects.all()
+        seriilzer = CategorySerializer(category, many=True)
+        return Response(seriilzer.data)
+
+    def post(self, request):
+        serializer = CategorySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+class TagListCreateAPIView(APIView):
+    def get(self, request):
+        tags = Tag.objects.all()
+        serializer = TagSerializer(tags, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = TagSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
